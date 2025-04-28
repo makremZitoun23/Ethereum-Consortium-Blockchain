@@ -1,0 +1,49 @@
+version: '3.9'
+services:
+  geth:
+    image: ${GETH_IMAGE}
+    container_name: ${NODE_NAME}-geth
+    restart: always
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Create data dir if not exists
+        mkdir -p /root/.ethereum
+
+        # Create account if keystore is empty
+        if [ ! "$(ls -A /root/.ethereum/keystore)" ]; then
+          echo "Creating new Ethereum account..."
+          geth account new --password /root/.ethereum/password.txt
+        fi
+
+        # Initialize genesis if chaindata folder does not exist
+        if [ ! -d "/root/.ethereum/geth/chaindata" ]; then
+          echo "Initializing genesis..."
+          geth init /root/.ethereum/genesis.json
+        fi
+
+        geth \
+          --networkid ${GETH_NETWORK_ID} \
+          --http \
+          --http.addr 0.0.0.0 \
+          --http.api eth,net,web3,personal \
+          --http.corsdomain "*" \
+          --http.vhosts "*" \
+          --authrpc.port 8551 \
+          --authrpc.addr 0.0.0.0 \
+          --authrpc.vhosts "*" \
+          --syncmode ${GETH_SYNC_MODE} \
+          --cache ${GETH_CACHE} \
+          --allow-insecure-unlock
+    ports:
+      - "${GETH_HTTP_PORT}:8545"
+      - "${GETH_WS_PORT}:8546"
+      - "${GETH_P2P_PORT}:30303"
+      - "${GETH_P2P_PORT}:30303/udp"
+    volumes:
+      - ${GETH_DATA_DIR}:/root/.ethereum
+      - ./genesis.json:/root/.ethereum/genesis.json
+      - ./password.txt:/root/.ethereum/password.txt
+networks:
+  host:
+    driver: host
